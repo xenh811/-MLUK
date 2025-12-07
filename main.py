@@ -3,7 +3,9 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-API_TOKEN = "8257105888:AAEcJf7a5siSGXz5wfW6IE-fBcUJX-49U2Y"
+import os
+API_TOKEN = os.environ.get("BOT_TOKEN")
+
 
 # Ініціалізація бота з HTML
 bot = Bot(
