@@ -66,6 +66,5 @@ def main():
         port=int(os.getenv("PORT", 8080))   # Render передає PORT автоматично
     )
 
-
 if __name__ == "__main__":
     main()
