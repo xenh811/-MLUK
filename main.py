@@ -1,70 +1,137 @@
-import os
 import asyncio
+import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
+from aiogram.filters import Command
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-# -----------------------------
-# ENV змінні (Render / локально)
-# -----------------------------
-TOKEN = os.getenv("BOT_TOKEN")
-if TOKEN is None:
-    raise ValueError("BOT_TOKEN is not set in environment variables!")
 
-WEBHOOK_PATH = "/webhook"
 
-# Render встановлює RENDER_EXTERNAL_URL автоматично
-BASE_URL = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8080")
+# ТОКЕН БОТА
+# TOKEN = "8257105888:AAFoBy0W2IjPK_6sWKf-DIQny1j87EFEggw" локальний варіант
 
-WEBHOOK_URL = BASE_URL + WEBHOOK_PATH
-
-# -----------------------------
-# Ініціалізація бота
-# -----------------------------
+TOKEN = os.getenv("BOT_TOKEN") # токен вписується в рендері (environment variable Render)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-@dp.message()
-async def echo(message: types.Message):
-    await message.answer("Webhook працює! ✔️")
+
+#  КНОПКИ
+menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="🔔 Розклад дзвінків")],
+        [KeyboardButton(text="📰 Новини ліцею")],
+        [KeyboardButton(text="📁 Корисні матеріали")],
+        [KeyboardButton(text="👨‍🏫 Кабінет вчителя")],
+        [KeyboardButton(text="📅 Мій розклад")]
+    ],
+    resize_keyboard=True
+)
 
 
-# -----------------------------
-# Webhook запуск / зупинка
-# -----------------------------
-async def on_startup(app: web.Application):
-    print("Setting webhook:", WEBHOOK_URL)
-    await bot.set_webhook(WEBHOOK_URL)
+#  ДАНІ
+BELLS = """
+🔔 Розклад дзвінків
+
+1️⃣ 08:30 – 09:15
+2️⃣ 09:25 – 10:10
+3️⃣ 10:20 – 11:05
+4️⃣ 11:25 – 12:10
+5️⃣ 12:20 – 13:05
+6️⃣ 13:15 – 14:00
+"""
+
+GOOGLE_DRIVE_LINK = "ПОСИЛАННЯ_НА_GOOGLE_DRIVE"
+
+NEWS = [
+    "📢 10.09 — День здоров'я",
+    "📢 15.09 — Батьківські збори"
+]
+
+teachers = {
+    123456789: {
+        "name": "Іваненко Олег",
+        "subject": "Математика",
+        "schedule": {
+            "Понеділок": "8-А, 8-Б",
+            "Вівторок": "9-А",
+            "Середа": "11-Г",
+            "Четвер": "10-А",
+            "Пʼятниця": "8-А"
+        }
+    }
+}
 
 
-async def on_shutdown(app: web.Application):
-    print("Deleting webhook...")
-    await bot.delete_webhook()
+#  ХЕНДЛЕРИ
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    await message.answer("Вітаю 👋\nОбери пункт меню:", reply_markup=menu)
 
+@dp.message(lambda m: m.text == "🔔 Розклад дзвінків")
+async def bells(message: types.Message):
+    await message.answer(BELLS)
 
-# -----------------------------
-# Aiohttp сервер
-# -----------------------------
-def main():
-    app = web.Application()
+@dp.message(lambda m: m.text == "📁 Корисні матеріали")
+async def materials(message: types.Message):
+    await message.answer(f"✅ Корисні матеріали:\n{GOOGLE_DRIVE_LINK}")
 
-    # підключаємо хендлери aiogram
-    SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot
-    ).register(app, path=WEBHOOK_PATH)
+@dp.message(lambda m: m.text == "📰 Новини ліцею")
+async def news_handler(message: types.Message):
+    await message.answer("\n".join(NEWS))
 
-    setup_application(app, dp, bot=bot)
+@dp.message(lambda m: m.text == "👨‍🏫 Кабінет вчителя")
+async def teacher_cabinet(message: types.Message):
+    teacher = teachers.get(message.from_user.id)
+    if not teacher:
+        await message.answer("❌ Доступ заборонений")
+        return
 
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
-
-    web.run_app(
-        app,
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 8080))   # Render передає PORT автоматично
+    await message.answer(
+        f"👨‍🏫 {teacher['name']}\n"
+        f"📘 Предмет: {teacher['subject']}\n\n"
+        "✏️ Редагування розкладу:\n"
+        "✏️ Понеділок: 9-А, 10-Б"
     )
 
+@dp.message(lambda m: m.text == "📅 Мій розклад")
+async def my_schedule(message: types.Message):
+    teacher = teachers.get(message.from_user.id)
+    if not teacher:
+        return
+
+    text = "📅 Ваш розклад:\n\n"
+    for day, lessons in teacher["schedule"].items():
+        text += f"{day}: {lessons}\n"
+    await message.answer(text)
+
+@dp.message(lambda m: m.text.startswith("✏️"))
+async def edit_schedule(message: types.Message):
+    teacher = teachers.get(message.from_user.id)
+    if not teacher:
+        return
+
+    try:
+        data = message.text.replace("✏️", "").strip()
+        day, value = data.split(":", 1)
+        teacher["schedule"][day.strip()] = value.strip()
+        await message.answer("✅ Розклад оновлено")
+    except:
+        await message.answer("❌ Невірний формат\n✏️ Понеділок: 9-А, 10-Б")
+
+async def main():
+    print("Бот працює на Render ✔️")
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
+
+#  ЛОКАЛЬНИЙ ЗАПУСК (POLLING)
+# async def main_local():
+#     print("Бот запущено локально ✔️")
+#     await dp.start_polling(bot)
+
+# if __name__ == "__main__":
+#     asyncio.run(main_local())
+
+
+

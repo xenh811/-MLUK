@@ -4,6 +4,7 @@ services:
     env: python
     plan: free
     region: frankfurt
+    rootDirectory: BOT
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python main.py"
     envVars:
