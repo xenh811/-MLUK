@@ -1,12 +1,12 @@
 services:
-  - type: worker
-    name: telegram-bot
-    env: python
+  - type: web
+    name: tg-bot
+    runtime: python
     plan: free
-    region: frankfurt
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python3 main.py"
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+
     envVars:
       - key: BOT_TOKEN
         sync: false
-
